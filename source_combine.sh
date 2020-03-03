@@ -30,8 +30,13 @@ function process_file() {
         local lin=${file_data[i]}
         local trimmed_line="${lin#"${lin%%[![:space:]]*}"}"
 
+        if [[ $trimmed_line == "#!"* ]]; then
+            # do not place several shebangs, this
+            # compiler adds its own shebang at the top
+            continue
+        fi
         if [[ $trimmed_line == "#"* ]]; then
-            # echo "is comment!"
+            # this is a comment
             echo "${file_data[i]}"
             continue
         fi
@@ -42,7 +47,6 @@ function process_file() {
         fi
 
         if [[ $trimmed_line == "import"* ]]; then
-            # echo "Its an import!"
             local remove_import="import "
             local actual_import_string="${trimmed_line##$remove_import}"
             # make an array of import args:
@@ -118,6 +122,9 @@ main_script_text=$(<"$main_script")
 # from the main script are relative it will find it
 # no matter how deep/complex the nested import structure is
 MAIN_DIR="$(cd ${main_script%/*} && pwd)"
+
+# use this shebang in the compiled file
+echo "#!/usr/bin/env bash"
 
 # this will echo out the whole compiled file
 process_file "$main_script_text"

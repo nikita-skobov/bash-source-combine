@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
 
-# # eg:
-# # file1.sh
-# # load my_function:
-# source ./my_function.sh
-# my_function "hello"
-
-
-# # my_function.sh
-# my_function() {
-#   echo "input: $1"   
-# }
-
-
 ################## START OF oo-bootstrap.sh ######################
 
 # This code was taken directly from
@@ -393,13 +380,23 @@ fi
 PROCESSED_FILE_LIST=()
 
 main_script_text=$(<"$main_script")
+main_script_location="${main_script%/*}"
 
 # this is an env variable set for the oo-bootstrap script
 # to properly resolve relative path names of imports.
 # by setting it to the main script, as long as all imports
 # from the main script are relative it will find it
 # no matter how deep/complex the nested import structure is
-MAIN_DIR="$(cd ${main_script%/*} && pwd)"
+MAIN_DIR="$PWD"
+if [[ "$main_script_location" != "$main_script" ]]; then
+    # in this case the user entered a path to a script
+    # either a ./file.sh
+    # or ../../somefolder/file.sh
+    # or somefolder/file.sh
+    # or /absolutepath/to/folder/file.sh
+    # so we must resolve the path:
+    MAIN_DIR="$(cd ${main_script%/*} && pwd)"
+fi
 
 # use this shebang in the compiled file
 echo "#!/usr/bin/env bash"

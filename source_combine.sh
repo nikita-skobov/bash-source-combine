@@ -363,6 +363,7 @@ function process_file() {
 
 
 ECHO_INSTEAD_OF_SOURCE="true"
+
 # no need to source it anymore
 # since its included in this file
 # builtin source "$( cd "${BASH_SOURCE[0]%/*}" && pwd )/oo-bootstrap.sh"

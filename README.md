@@ -103,3 +103,11 @@ source_combine_run my_main.sh arg1 arg2
 # arg1
 # arg1 and arg2
 ```
+
+# License
+
+This project is distributed under the AGPL3 license. The license for this project is located in [./LICENSE](https://github.com/nikita-skobov/bash-source-combine/blob/master/LICENSE)
+
+This project uses the following external libraries/projects:
+
+- [bash-oo-framework](https://github.com/niieani/bash-oo-framework). The license file for this project is included in [./bash-oo-framework_LICENSE](https://github.com/nikita-skobov/bash-source-combine/blob/master/bash-oo-framework_LICENSE)

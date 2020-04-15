@@ -34,7 +34,12 @@ The intended usage of these scripts is for them to be installed and be available
 ```sh
 git clone <this_repo_name>
 cd <this_repo_name>
-sudo cp lib/bash/* /usr/local/bin
+sudo cp source_combine.sh /usr/local/bin/source_combine
+sudo cp source_combine_run.sh /usr/local/bin/source_combine_run
+
+# make sure they have are executable:
+sudo chmod +x /usr/local/bin/source_combine
+sudo chmod +x /usr/local/bin/source_combine_run
 ```
 
 
@@ -76,4 +81,25 @@ do_this() {
 do_that() {
     echo "$1 and $2"
 }
+
+do_this
+do_that
+```
+
+Which can then be ran as:
+
+```sh
+./my_main_combined.sh arg1 arg2
+# will output:
+# arg1
+# arg1 and arg2
+```
+
+Or you can run it directly without outputting a file via:
+
+```sh
+source_combine_run my_main.sh arg1 arg2
+# will output:
+# arg1
+# arg1 and arg2
 ```

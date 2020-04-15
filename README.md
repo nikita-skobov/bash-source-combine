@@ -2,7 +2,7 @@
 
 ## What is it?
 
-Bash source combine is a script that uses the import part of [bash oo-framework](https://github.com/niieani/bash-oo-framework) to accomplish a basic form of bash compilation.
+bash-source-combine is a script that uses the import part of [bash oo-framework](https://github.com/niieani/bash-oo-framework) to accomplish a basic form of bash compilation.
 
 Specifically, it can take import syntax in the form:
 
@@ -15,13 +15,13 @@ and it transcludes the content of `../folder/my_functions.sh` directly in place.
 
 ## How to use it?
 
-bash source combine simply echoes out the combined file, so the basic usage is to redirect STDOUT to a file like so:
+bash-source-combine echoes out the combined file, so the basic usage is to redirect STDOUT to a file:
 
 ```sh
 source_combine my_main_file.sh > my_main_file_combined.sh
 ```
 
-If instead you wish to run my_main_file.sh instead of combining it into a file first, there is provided: `source_combine_run.sh` which uses source_combine (it finds it from your system path. see the installation section) and it sources the resulting combined script. It also allows for passing arguments. It only needs the first positional argument to be the name of the file being combined, and then it passes the rest of the arguments directly into the combined script:
+If instead you wish to run my_main_file.sh instead of combining it into a file first, there is provided: `source_combine_run.sh` which uses source_combine (it finds it from your system path. See the installation section) and it sources the resulting combined script. It also allows for passing arguments. The first argument is the name of the script to combine and run. The remaining arguments are passed to the combined script:
 
 ```sh
 source_combine_run my_main_file.sh --some-arg1 --some-arg2 etc
@@ -32,12 +32,12 @@ source_combine_run my_main_file.sh --some-arg1 --some-arg2 etc
 The intended usage of these scripts is for them to be installed and be available on your system path. Specifically where you put these is up to you, but I prefer to put them in `/usr/local/bin`.
 
 ```sh
-git clone <this_repo_name>
-cd <this_repo_name>
+git clone https://github.com/nikita-skobov/bash-source-combine
+cd bash-source-combine
 sudo cp source_combine.sh /usr/local/bin/source_combine
 sudo cp source_combine_run.sh /usr/local/bin/source_combine_run
 
-# make sure they have are executable:
+# make sure they are executable:
 sudo chmod +x /usr/local/bin/source_combine
 sudo chmod +x /usr/local/bin/source_combine_run
 ```

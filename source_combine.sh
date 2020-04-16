@@ -339,7 +339,7 @@ strip_unused_functions() {
 }
 
 
-function process_file() {
+process_file() {
     local file_data=()
     while IFS= read -r line; do
         # echo $line;

@@ -386,7 +386,6 @@ process_file() {
                 # so first, get a string of the names of functions to be
                 # imported
                 local function_names="${actual_import_string%from*}"
-                echo "# function names: $function_names"
                 # then: change the actual import string to only contain
                 # the filename:
                 actual_import_string="${actual_import_string#*from\ }"
@@ -401,7 +400,6 @@ process_file() {
                 else
                     for fname in $function_names; do
                         import_functions[$ind]="$fname"
-                        echo "function names of 0: ${import_functions[0]}"
                         ((ind+=1))
                     done
                 fi

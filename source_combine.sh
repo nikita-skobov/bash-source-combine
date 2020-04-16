@@ -273,6 +273,70 @@ declare -g __oo__bootstrapped=true
 
 
 
+strip_unused_functions() {
+    # 1 should be the string of the whole file
+    # the rest of the arguments should be the function names
+    # to be included
+    # so strip out all of the other functions
+    local file_data=()
+    while IFS= read -r line; do
+        # echo $line;
+        file_data+=("$line")
+    done <<< "$1"
+    shift
+    local file_data_len=${#file_data[@]}
+    local ind=0
+    while [[ $ind -lt $file_data_len ]]; do
+        local lin=${file_data[ind]}
+        local trimmed_line="${lin#"${lin%%[![:space:]]*}"}"
+        if [[ $trimmed_line == "#!"* ]]; then
+            # do not place several shebangs, this
+            # compiler adds its own shebang at the top
+            ((ind+=1))
+            continue
+        fi
+        if [[ $trimmed_line == "#"* ]]; then
+            # this is a comment
+            echo "${file_data[ind]}"
+            ((ind+=1))
+            continue
+        fi
+        if [[ -z "$trimmed_line" ]]; then
+            # echo "$i is empty!"
+            echo "${file_data[ind]}"
+            ((ind+=1))
+            continue
+        fi
+
+        if [[ $trimmed_line == "import"* ]]; then
+            # preserve imports
+            echo "${file_data[ind]}"
+        else
+            break
+        fi
+        ((ind+=1))
+    done
+
+    # now we want to source everything after line ind:
+    # and then simply echo out the function definitions
+    # as given by type
+    local rest_of_file=""
+    while [[ $ind -lt $file_data_len ]]; do
+        rest_of_file="$rest_of_file\n${file_data[ind]}"
+        ((ind+=1))
+    done
+    builtin source <(echo -e "$rest_of_file")
+
+    # iterate over function names, and echo out their definitions:
+    for func_name in "$@"; do
+        func_def=$(type "$func_name" 2> /dev/null)
+        if [[ -z $func_def ]]; then
+            echo "FAILED TO FIND IMPORT FOR '$func_name'"
+            exit 1
+        fi
+        echo "${func_def#*function}"
+    done
+}
 
 
 function process_file() {
@@ -310,8 +374,38 @@ function process_file() {
         fi
 
         if [[ $trimmed_line == "import"* ]]; then
+            local import_functions=("*")
             local remove_import="import "
             local actual_import_string="${trimmed_line##$remove_import}"
+            if [[ $actual_import_string == *"from"* ]]; then
+                # echo "# ITS A FROM JUST SKIP IT!"
+                # echo "everything after 'from ' ${actual_import_string#*from\ }"
+                # echo "everything before ' from' ${actual_import_string%from*}"
+                # in this case the import string looks something like this:
+                # import X Y from file
+                # so first, get a string of the names of functions to be
+                # imported
+                local function_names="${actual_import_string%from*}"
+                echo "# function names: $function_names"
+                # then: change the actual import string to only contain
+                # the filename:
+                actual_import_string="${actual_import_string#*from\ }"
+
+                # next, read an array of the function names
+                # to be imported from this file
+                local ind=0
+                if [[ $function_names == "* " ]]; then
+                    # if user just wants to do
+                    # import * from X
+                    import_functions[0]="*"
+                else
+                    for fname in $function_names; do
+                        import_functions[$ind]="$fname"
+                        echo "function names of 0: ${import_functions[0]}"
+                        ((ind+=1))
+                    done
+                fi
+            fi
             # make an array of import args:
             IFS=' ' read -ra input_args <<< "$actual_import_string"
 
@@ -336,7 +430,12 @@ function process_file() {
             done
             
             the_actual_script=$(import "${input_args_without_duplicates[@]}")
-            process_file "$the_actual_script"
+            if [[ ${import_functions[0]} == "*" ]]; then
+                process_file "$the_actual_script"
+            else
+                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_functions[@]}")
+                process_file "$stripped_script"
+            fi
             continue
         elif [[ $trimmed_line == "source"* && $trimmed_line == *"oo-bootstrap"* ]]; then
             continue

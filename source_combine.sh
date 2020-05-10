@@ -416,8 +416,13 @@ process_file() {
                 if [[ "$import_name" != "http"* ]]; then
                     # if its http/https, leave import name as is
                     # otherwise, get full path to the file:
-                    local dir_of_import="$(cd $MAIN_DIR/${input_args[i]%/*} && pwd)"
-                    import_name="$dir_of_import/${input_args[i]}"
+                    local dir_name="$MAIN_DIR/${input_args[i]%/*}"
+                    if [[ -f $dir_name ]]; then
+                        import_name="$MAIN_DIR/${input_args[i]}"
+                    else
+                        local dir_of_import="$(cd $dir_name && pwd)"
+                        import_name="$dir_of_import/${input_args[i]}"
+                    fi
                 fi
                 if [[ " ${PROCESSED_FILE_LIST[@]} " =~ " ${import_name} " ]]; then
                     continue
@@ -427,13 +432,30 @@ process_file() {
                 PROCESSED_FILE_LIST+=("$import_name")
             done
             
+            local currdir="$PWD"
+            # echo "# CURRENTLY INSIDE $currdir"
+            # echo "# IMPORTING: ${input_args_without_duplicates[@]}"
+            # TODO: change this to get proper paths to ALL import args
+            # for now, this is only using the first import arg
+            # which for my use case is enough, but I need to implement
+            # this in the future to enable things such as:
+            # import folder_one/function_one.sh folder_two/function_two.sh
+            local nextdir="${input_args_without_duplicates[0]%/*}"
             the_actual_script=$(import "${input_args_without_duplicates[@]}")
+            if [[ ! -f $nextdir ]]; then
+                # avoid changing directories to cases like:
+                # import some_file.sh
+                cd $nextdir
+                MAIN_DIR="$PWD"
+            fi
             if [[ ${import_functions[0]} == "*" ]]; then
                 process_file "$the_actual_script"
             else
                 local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_functions[@]}")
                 process_file "$stripped_script"
             fi
+            cd $currdir
+            MAIN_DIR="$PWD"
             continue
         elif [[ $trimmed_line == "source"* && $trimmed_line == *"oo-bootstrap"* ]]; then
             continue
@@ -486,6 +508,8 @@ main_script_location="${main_script%/*}"
 # from the main script are relative it will find it
 # no matter how deep/complex the nested import structure is
 MAIN_DIR="$PWD"
+# save users location to return back to it afterwards
+BEFORE_MAIN_DIR="$PWD"
 if [[ "$main_script_location" != "$main_script" ]]; then
     # in this case the user entered a path to a script
     # either a ./file.sh
@@ -494,6 +518,7 @@ if [[ "$main_script_location" != "$main_script" ]]; then
     # or /absolutepath/to/folder/file.sh
     # so we must resolve the path:
     MAIN_DIR="$(cd ${main_script%/*} && pwd)"
+    cd $MAIN_DIR
 fi
 
 # use this shebang in the compiled file
@@ -501,3 +526,6 @@ echo "#!/usr/bin/env bash"
 
 # this will echo out the whole compiled file
 process_file "$main_script_text"
+
+# go back to where the user was
+cd $BEFORE_MAIN_DIR

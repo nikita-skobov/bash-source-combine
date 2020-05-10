@@ -378,9 +378,6 @@ process_file() {
             local remove_import="import "
             local actual_import_string="${trimmed_line##$remove_import}"
             if [[ $actual_import_string == *"from"* ]]; then
-                # echo "# ITS A FROM JUST SKIP IT!"
-                # echo "everything after 'from ' ${actual_import_string#*from\ }"
-                # echo "everything before ' from' ${actual_import_string%from*}"
                 # in this case the import string looks something like this:
                 # import X Y from file
                 # so first, get a string of the names of functions to be
@@ -433,8 +430,6 @@ process_file() {
             done
             
             local currdir="$PWD"
-            # echo "# CURRENTLY INSIDE $currdir"
-            # echo "# IMPORTING: ${input_args_without_duplicates[@]}"
             # TODO: change this to get proper paths to ALL import args
             # for now, this is only using the first import arg
             # which for my use case is enough, but I need to implement

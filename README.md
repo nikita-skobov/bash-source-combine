@@ -240,4 +240,4 @@ This project is distributed under the AGPL3 license. The license for this projec
 
 This project uses the following external libraries/projects:
 
-- [bash-oo-framework](https://github.com/niieani/bash-oo-framework). The license file for this project is included in [./bash-oo-framework_LICENSE](https://github.com/nikita-skobov/bash-source-combine/blob/master/bash-oo-framework_LICENSE)
+- [bash-oo-framework](https://github.com/niieani/bash-oo-framework). The license file for this project is included in [./bash-oo-framework.txt](https://github.com/nikita-skobov/bash-source-combine/blob/master/bash-oo-framework.txt)

@@ -1,5 +1,5 @@
 function setup() {
-    source_combine=$BATS_TEST_DIRNAME/../source_combine.sh
+    source_combine=$BATS_TEST_DIRNAME/../source_combine_t.sh
     cd $BATS_TEST_DIRNAME
     some_contents="my_var=hello"
     some_dir="$BATS_TMPDIR/some_temp_dir"

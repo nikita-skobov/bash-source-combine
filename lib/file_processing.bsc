@@ -1,3 +1,33 @@
+# arg: $1: the trimmed line to test.
+# returns true if the line is a comment, or if its empty
+# which are the cases we want to echo the line
+# otherwise we return false, to prevent echoing
+should_echo() {
+    if [[ $1 == "#"* || -z "$1" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# arg: $1 the trimmed line to test.
+# returns true if its a shebang
+should_continue() {
+    if [[ $1 == "#!"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# arg: $1 the trimmed line to test.
+# returns true if it contains 'import'
+should_process_import() {
+    if [[ $1 == "import"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+
 process_file() {
     local file_data=()
     while IFS= read -r line; do
@@ -5,4 +35,57 @@ process_file() {
     done <<< "$1"
     # echo "$1"
 
+    local still_sourcing=true
+
+    for i in "${!file_data[@]}"; do
+        # if we are done processing import statements
+        # just echo the line as is:
+        if [[ "$still_sourcing" == false ]]; then
+            echo "${file_data[i]}"
+            continue
+        fi
+
+        local current_line=${file_data[i]}
+        # remove whitespace:
+        local trimmed_line="${lin#"${lin%%[![:space:]]*}"}"
+
+        if should_echo "$trimmed_line"; then
+            echo "$current_line"
+            continue
+        elif should_continue "$trimmed_line"; then
+            continue
+        elif should_process_import "$trimmed_line"; then
+            local import_files_list=()
+            local import_keywords_list=()
+            parse_import_statement file_data $i import_files_list import_keywords_list 
+            # TODO:
+            # implement duplicate file/keyword checking
+
+            local currdir="$PWD"
+            # TODO: change this to get proper paths to ALL import args
+            # for now, this is only using the first import arg
+            # which for my use case is enough, but I need to implement
+            # this in the future to enable things such as:
+            # import folder_one/function_one.sh folder_two/function_two.sh
+            local nextdir="${import_files_list[0]%/*}"
+            local the_actual_script=$(import "${input_args_without_duplicates[@]}")
+            if [[ ! -f $nextdir ]]; then
+                cd $nextdir
+                MAIN_DIR="$PWD"
+            fi        
+            if [[ ${import_keywords_list[0]} == "*" ]]; then
+                process_file "$the_actual_script"
+            else
+                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_keywords_list[@]}")
+                process_file "$stripped_script"
+            fi
+
+            cd $currdir
+            MAIN_DIR="$PWD"
+            continue
+        else
+            echo "$current_line"
+            still_sourcing=false
+        fi
+    done
 }

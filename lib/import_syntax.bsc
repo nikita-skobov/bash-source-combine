@@ -50,7 +50,8 @@ parse_import_statement() {
         echo "import string: $actual_import_string"
         local keywords="${actual_import_string%from*}"
         # remove everything before the from keyword:
-        actual_import_string="${actual_import_string#*from\ }"
+        local remove_from="from\ "
+        actual_import_string="${actual_import_string#*$remove_from}"
         
         # in the case of import A B from X, you can only
         # supply a single import file, so no need to loop
@@ -61,13 +62,15 @@ parse_import_statement() {
 
         # explicitly check if its just a star
         # otherwise, the loop below will loop over files...
-        if [[ $keywords == "* " ]]; then
+        if [[ $keywords == "* "* ]]; then
             _import_keywords_list+=("*")
             return 0
         fi
 
         for kname in $keywords; do
-            _import_keywords_list+=("$kname")
+            if [[ $kname != "{" && $kname != "}" ]]; then
+                _import_keywords_list+=("$kname")
+            fi
         done
     fi
 }

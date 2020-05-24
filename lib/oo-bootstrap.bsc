@@ -126,11 +126,14 @@ System::ImportOne() {
   # try without parent
   # try global library
   # try local library
-  {
-    local localPath="$( cd "${BASH_SOURCE[1]%/*}" && pwd )"
-    localPath="${localPath}/${libPath}"
-    System::SourcePath "${localPath}" "$@"
-  } || \
+  ## Update May 2020:
+  ## I commented out this line because I use a MAIN_DIR
+  ## variable below, instead of relying on BASH_SOURCE
+  # {
+  #   local localPath="$( cd "${BASH_SOURCE[1]%/*}" && pwd )"
+  #   localPath="${localPath}/${libPath}"
+  #   System::SourcePath "${localPath}" "$@"
+  # } || \
   # If user set a MAIN_DIR env var, try that:
   # if its not set, then this becomes the same as the next one.
   System::SourcePath "${MAIN_DIR}/${requestedPath}" "$@" || \

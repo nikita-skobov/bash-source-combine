@@ -96,6 +96,7 @@ parse_import_statement() {
                 for i in $actual_import_string; do
                     _import_files_list+=("$i")
                 done
+                skip_i=$ind
                 return 0
             fi
 

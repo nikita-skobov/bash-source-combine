@@ -106,11 +106,25 @@ process_file() {
 
     local still_sourcing=true
 
+    local skip_i=0
     for i in "${!file_data[@]}"; do
         # if we are done processing import statements
         # just echo the line as is:
         if [[ "$still_sourcing" == false ]]; then
             echo "${file_data[i]}"
+            continue
+        fi
+
+        # these lines exist because of multi-line
+        # import statements
+        # if the 'parse_import_statement' sets the skip_i
+        # variable, then we skip the line until i reaches
+        # skip_i. at that point, we set skip_i back to 0
+        # and resume normal parsing
+        if [[ $i -lt $skip_i ]]; then
+            continue
+        elif [[ $i == $skip_i && $skip_i != 0 ]]; then
+            skip_i=0
             continue
         fi
 

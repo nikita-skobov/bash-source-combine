@@ -1,0 +1,48 @@
+import ./oo-bootstrap.bsc
+import ./file_processing.bsc
+import ./import_syntax.bsc
+
+ECHO_INSTEAD_OF_SOURCE="true"
+
+main_script="$1"
+
+if [[ -z $main_script ]]; then
+    echo "Must provide a path to the script that you wish to combine the source for." && exit 1
+fi
+
+if [[ ! -f $main_script ]]; then
+    echo "$main_script is not a file" && exit 1
+fi
+
+PROCESSED_FILE_LIST=()
+
+main_script_text=$(<"$main_script")
+main_script_location="${main_script%/*}"
+
+# this is an env variable set for the oo-bootstrap script
+# to properly resolve relative path names of imports.
+# by setting it to the main script, as long as all imports
+# from the main script are relative it will find it
+# no matter how deep/complex the nested import structure is
+MAIN_DIR="$PWD"
+# save users location to return back to it afterwards
+BEFORE_MAIN_DIR="$PWD"
+if [[ "$main_script_location" != "$main_script" ]]; then
+    # in this case the user entered a path to a script
+    # either a ./file.sh
+    # or ../../somefolder/file.sh
+    # or somefolder/file.sh
+    # or /absolutepath/to/folder/file.sh
+    # so we must resolve the path:
+    MAIN_DIR="$(cd ${main_script%/*} && pwd)"
+    cd $MAIN_DIR
+fi
+
+# use this shebang in the compiled file
+echo "#!/usr/bin/env bash"
+
+# this will echo out the whole compiled file
+process_file "$main_script_text"
+
+# go back to where the user was
+cd $BEFORE_MAIN_DIR

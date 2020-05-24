@@ -1,0 +1,191 @@
+# arg: $1: the trimmed line to test.
+# returns true if the line is a comment, or if its empty
+# which are the cases we want to echo the line
+# otherwise we return false, to prevent echoing
+should_echo() {
+    if [[ $1 == "#"* || -z "$1" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# arg: $1 the trimmed line to test.
+# returns true if its a shebang
+should_continue() {
+    if [[ $1 == "#!"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# arg: $1 the trimmed line to test.
+# returns true if it contains 'import'
+should_process_import() {
+    if [[ $1 == "import"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+
+# 1 should be the string of the whole file
+# the rest of the arguments should be the function names
+# to be included
+# so strip out all of the other functions
+strip_unused_functions() {
+    local file_data=()
+    while IFS= read -r line; do
+        # echo $line;
+        file_data+=("$line")
+    done <<< "$1"
+    shift
+    local file_data_len=${#file_data[@]}
+    local ind=0
+    while [[ $ind -lt $file_data_len ]]; do
+        local lin=${file_data[ind]}
+        local trimmed_line="${lin#"${lin%%[![:space:]]*}"}"
+        if [[ $trimmed_line == "#!"* ]]; then
+            # do not place several shebangs, this
+            # compiler adds its own shebang at the top
+            ((ind+=1))
+            continue
+        fi
+        if [[ $trimmed_line == "#"* ]]; then
+            # this is a comment
+            echo "${file_data[ind]}"
+            ((ind+=1))
+            continue
+        fi
+        if [[ -z "$trimmed_line" ]]; then
+            # echo "$i is empty!"
+            echo "${file_data[ind]}"
+            ((ind+=1))
+            continue
+        fi
+
+        if [[ $trimmed_line == "import"* ]]; then
+            # preserve imports
+            echo "${file_data[ind]}"
+        else
+            break
+        fi
+        ((ind+=1))
+    done
+
+    # now we want to source everything after line ind:
+    # and then simply echo out the function definitions
+    # as given by type
+    local rest_of_file=""
+    while [[ $ind -lt $file_data_len ]]; do
+        rest_of_file="$rest_of_file\n${file_data[ind]}"
+        ((ind+=1))
+    done
+    builtin source <(echo -e "$rest_of_file")
+
+    # iterate over function names, and echo out their definitions:
+    for func_name in "$@"; do
+        func_def=$(type "$func_name" 2> /dev/null)
+        if [[ -z $func_def ]]; then
+            echo "FAILED TO FIND IMPORT FOR '$func_name'"
+            exit 1
+        fi
+        echo "${func_def#*function}"
+    done
+}
+
+# a variable of absolute paths to files that
+# have been imported. before importing a file
+# check if its full path exists here.
+full_path_cache=()
+
+process_file() {
+    local file_data=()
+    while IFS= read -r line; do
+        file_data+=("$line")
+    done <<< "$1"
+
+    local still_sourcing=true
+
+    local skip_i=0
+    for i in "${!file_data[@]}"; do
+        # if we are done processing import statements
+        # just echo the line as is:
+        if [[ "$still_sourcing" == false ]]; then
+            echo "${file_data[i]}"
+            continue
+        fi
+
+        # these lines exist because of multi-line
+        # import statements
+        # if the 'parse_import_statement' sets the skip_i
+        # variable, then we skip the line until i reaches
+        # skip_i. at that point, we set skip_i back to 0
+        # and resume normal parsing
+        if [[ $i -lt $skip_i ]]; then
+            continue
+        elif [[ $i == $skip_i && $skip_i != 0 ]]; then
+            skip_i=0
+            continue
+        fi
+
+        local current_line=${file_data[i]}
+        # remove whitespace:
+        local trimmed_line="${current_line#"${current_line%%[![:space:]]*}"}"
+
+        if should_process_import "$trimmed_line"; then
+            local import_files_list=()
+            local import_keywords_list=()
+            parse_import_statement file_data $i import_files_list import_keywords_list 
+            # TODO:
+            # implement duplicate keyword checking
+            local import_files_list_without_duplicates=()
+            for i in ${import_files_list[@]}; do
+                local full_path=$(readlink -f $i)
+                if [[ "${full_path_cache[@]}" != *"$full_path"* ]]; then
+                    # this is a file that has not been imported before
+                    # so add it to the cache, to prevent it from
+                    # being imported again in the future
+                    import_files_list_without_duplicates+=("$i")
+                    full_path_cache+=("$full_path")
+                fi
+            done
+
+            # if we removed all duplicates, and the remaining list
+            # is empty, skip this import
+            if [[ ${#import_files_list_without_duplicates[@]} -eq 0 ]]; then
+                continue
+            fi
+
+            local currdir="$PWD"
+            # TODO: change this to get proper paths to ALL import args
+            # for now, this is only using the first import arg
+            # which for my use case is enough, but I need to implement
+            # this in the future to enable things such as:
+            # import folder_one/function_one.sh folder_two/function_two.sh
+            local nextdir="${import_files_list_without_duplicates[0]%/*}"
+            local the_actual_script=$(import "${import_files_list_without_duplicates[@]}")
+            if [[ ! -f $nextdir ]]; then
+                cd $nextdir
+                MAIN_DIR="$PWD"
+            fi
+            if [[ ${import_keywords_list[0]} == "*" ]]; then
+                process_file "$the_actual_script"
+            else
+                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_keywords_list[@]}")
+                process_file "$stripped_script"
+            fi
+
+            cd $currdir
+            MAIN_DIR="$PWD"
+            continue
+        elif should_continue "$trimmed_line"; then
+            continue
+        elif should_echo "$trimmed_line"; then
+            echo "$current_line"
+            continue
+        else
+            echo "$current_line"
+            still_sourcing=false
+        fi
+    done
+}

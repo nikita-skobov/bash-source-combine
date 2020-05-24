@@ -1,5 +1,13 @@
 # bash-source-combine
 
+## Table of contents
+
+* [What is it?](#what-is-it)
+* [How to use it?](#how-to-use-it)
+* [Installation](#installation)
+* [Development](#development)
+* [Examples](#examples)
+
 ## What is it?
 
 bash-source-combine is a script that uses the import part of [bash oo-framework](https://github.com/niieani/bash-oo-framework) to accomplish a basic form of bash compilation.
@@ -8,20 +16,18 @@ Specifically, it can take import syntax in the form:
 
 ```sh
 import ../folder/my_functions.sh
+# OR:
+import ./my_file.sh ../folder/my_functions.sh
+# OR:
+import func_one func_two from ../folder/my_functions.sh
+# OR:
+import {
+    func_one
+    func_two
+} from ../folder/my_functions.sh
 ```
 
-and it transcludes the content of `../folder/my_functions.sh` directly in place.
-
-UPDATE 4/15/2020:
-
-It can now use the following syntax:
-
-```sh
-import some_function from ../folder/my_functions.sh
-```
-
-Which will read the `../folder/my_functions.sh` file and only include the function with the name `some_function`. This syntax also supports providing multiple function names, see the [second example](#example2) for more details.
-
+and it transcludes the contents of the imported files directly in place.
 
 ## How to use it?
 
@@ -51,6 +57,32 @@ sudo cp source_combine_run.sh /usr/local/bin/source_combine_run
 sudo chmod +x /usr/local/bin/source_combine
 sudo chmod +x /usr/local/bin/source_combine_run
 ```
+
+
+## Development
+
+As of version 2.0.0, this script is [self hosted!](https://en.wikipedia.org/wiki/Self-hosting_(compilers)) meaning it is compiled using itself. The `lib/` folder contains the source code `.bsc` files which when compiled produce the `source_combine.sh` script in the root of this directory. If you wish to develop on this project, follow the installation section above, and then you can do:
+
+```sh
+# make sure you are in the root of this repo
+source_combine ./lib/source_combine.bsc > ./dev_source_combine.sh
+chmod +x ./dev_source_combine.sh
+```
+
+And then you can use the new output `dev_source_combine.sh` instead of the provided one.
+
+This is what the test running script does before it runs any of the tests:
+
+## Testing
+
+The tests are ran using [bats-core](https://github.com/bats-core/bats-core), and are located in the `test/` directory. To run the tests, make sure bats is installed, and then do:
+
+```sh
+# make sure you are in the root of the repo:
+./test/run_tests.sh
+```
+
+Which will first compile a test version of `source_combine.sh` from the files in `lib/` as `source_combine_t.sh`, and it will use this newly compiled file to run the tests.
 
 
 ## Examples
@@ -233,6 +265,61 @@ will do the exact same as:
 import Y
 ```
 
+### Example4
+
+
+my_functions.sh:
+
+```sh
+do_this() {
+    echo "$1"
+}
+
+do_something() {
+    echo "$2"
+}
+
+do_that() {
+    echo "$1 and $2"
+}
+
+```
+
+my_main.sh:
+
+```sh
+import {
+    do_this
+    do_that
+} from ./my_functions.sh
+
+do_this
+do_that
+```
+
+When you run:
+```sh
+source_combine my_main.sh > my_main_combined.sh
+```
+
+The output file `my_main_combined.sh` will look like:
+
+```sh
+#!/usr/bin/env bash
+
+do_this () 
+{ 
+    echo "$1"
+}
+
+do_that () 
+{ 
+    echo "$1 and $2"
+}
+
+do_this
+do_that
+```
 
 # License
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 ################## START OF oo-bootstrap.sh ######################
 
 # This code was taken directly from
@@ -128,11 +127,14 @@ System::ImportOne() {
   # try without parent
   # try global library
   # try local library
-  {
-    local localPath="$( cd "${BASH_SOURCE[1]%/*}" && pwd )"
-    localPath="${localPath}/${libPath}"
-    System::SourcePath "${localPath}" "$@"
-  } || \
+  ## Update May 2020:
+  ## I commented out this line because I use a MAIN_DIR
+  ## variable below, instead of relying on BASH_SOURCE
+  # {
+  #   local localPath="$( cd "${BASH_SOURCE[1]%/*}" && pwd )"
+  #   localPath="${localPath}/${libPath}"
+  #   System::SourcePath "${localPath}" "$@"
+  # } || \
   # If user set a MAIN_DIR env var, try that:
   # if its not set, then this becomes the same as the next one.
   System::SourcePath "${MAIN_DIR}/${requestedPath}" "$@" || \
@@ -270,14 +272,41 @@ alias .="__oo__allowFileReloading=true System::ImportOne"
 declare -g __oo__bootstrapped=true
 
 ################## END OF oo-bootstrap.sh ######################
+# arg: $1: the trimmed line to test.
+# returns true if the line is a comment, or if its empty
+# which are the cases we want to echo the line
+# otherwise we return false, to prevent echoing
+should_echo() {
+    if [[ $1 == "#"* || -z "$1" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# arg: $1 the trimmed line to test.
+# returns true if its a shebang
+should_continue() {
+    if [[ $1 == "#!"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# arg: $1 the trimmed line to test.
+# returns true if it contains 'import'
+should_process_import() {
+    if [[ $1 == "import"* ]]; then
+        return 0
+    fi
+    return 1
+}
 
 
-
+# 1 should be the string of the whole file
+# the rest of the arguments should be the function names
+# to be included
+# so strip out all of the other functions
 strip_unused_functions() {
-    # 1 should be the string of the whole file
-    # the rest of the arguments should be the function names
-    # to be included
-    # so strip out all of the other functions
     local file_data=()
     while IFS= read -r line; do
         # echo $line;
@@ -338,149 +367,213 @@ strip_unused_functions() {
     done
 }
 
+# a variable of absolute paths to files that
+# have been imported. before importing a file
+# check if its full path exists here.
+full_path_cache=()
 
 process_file() {
     local file_data=()
     while IFS= read -r line; do
-        # echo $line;
         file_data+=("$line")
     done <<< "$1"
 
     local still_sourcing=true
 
+    local skip_i=0
     for i in "${!file_data[@]}"; do
+        # if we are done processing import statements
+        # just echo the line as is:
         if [[ "$still_sourcing" == false ]]; then
             echo "${file_data[i]}"
             continue
         fi
 
-        local lin=${file_data[i]}
-        local trimmed_line="${lin#"${lin%%[![:space:]]*}"}"
-
-        if [[ $trimmed_line == "#!"* ]]; then
-            # do not place several shebangs, this
-            # compiler adds its own shebang at the top
+        # these lines exist because of multi-line
+        # import statements
+        # if the 'parse_import_statement' sets the skip_i
+        # variable, then we skip the line until i reaches
+        # skip_i. at that point, we set skip_i back to 0
+        # and resume normal parsing
+        if [[ $i -lt $skip_i ]]; then
             continue
-        fi
-        if [[ $trimmed_line == "#"* ]]; then
-            # this is a comment
-            echo "${file_data[i]}"
-            continue
-        fi
-        if [[ -z "$trimmed_line" ]]; then
-            # echo "$i is empty!"
-            echo "${file_data[i]}"
+        elif [[ $i == $skip_i && $skip_i != 0 ]]; then
+            skip_i=0
             continue
         fi
 
-        if [[ $trimmed_line == "import"* ]]; then
-            local import_functions=("*")
-            local remove_import="import "
-            local actual_import_string="${trimmed_line##$remove_import}"
-            if [[ $actual_import_string == *"from"* ]]; then
-                # in this case the import string looks something like this:
-                # import X Y from file
-                # so first, get a string of the names of functions to be
-                # imported
-                local function_names="${actual_import_string%from*}"
-                # then: change the actual import string to only contain
-                # the filename:
-                actual_import_string="${actual_import_string#*from\ }"
+        local current_line=${file_data[i]}
+        # remove whitespace:
+        local trimmed_line="${current_line#"${current_line%%[![:space:]]*}"}"
 
-                # next, read an array of the function names
-                # to be imported from this file
-                local ind=0
-                if [[ $function_names == "* " ]]; then
-                    # if user just wants to do
-                    # import * from X
-                    import_functions[0]="*"
-                else
-                    for fname in $function_names; do
-                        import_functions[$ind]="$fname"
-                        ((ind+=1))
-                    done
+        if should_process_import "$trimmed_line"; then
+            local import_files_list=()
+            local import_keywords_list=()
+            parse_import_statement file_data $i import_files_list import_keywords_list 
+            # TODO:
+            # implement duplicate keyword checking
+            local import_files_list_without_duplicates=()
+            for i in ${import_files_list[@]}; do
+                local full_path=$(readlink -f $i)
+                if [[ "${full_path_cache[@]}" != *"$full_path"* ]]; then
+                    # this is a file that has not been imported before
+                    # so add it to the cache, to prevent it from
+                    # being imported again in the future
+                    import_files_list_without_duplicates+=("$i")
+                    full_path_cache+=("$full_path")
                 fi
-            fi
-            # make an array of import args:
-            IFS=' ' read -ra input_args <<< "$actual_import_string"
-
-
-            # Loop through the input args, and ensure
-            # that we have not already imported any of them.
-            local input_args_without_duplicates=()
-            for i in ${!input_args[@]}; do
-                local import_name="${input_args[i]}"
-                if [[ "$import_name" != "http"* ]]; then
-                    # if its http/https, leave import name as is
-                    # otherwise, get full path to the file:
-                    local dir_name="$MAIN_DIR/${input_args[i]%/*}"
-                    if [[ -f $dir_name ]]; then
-                        import_name="$MAIN_DIR/${input_args[i]}"
-                    else
-                        local dir_of_import="$(cd $dir_name && pwd)"
-                        import_name="$dir_of_import/${input_args[i]}"
-                    fi
-                fi
-                if [[ " ${PROCESSED_FILE_LIST[@]} " =~ " ${import_name} " ]]; then
-                    continue
-                fi
-
-                input_args_without_duplicates+=("${input_args[i]}")
-                PROCESSED_FILE_LIST+=("$import_name")
             done
-            
+
+            # if we removed all duplicates, and the remaining list
+            # is empty, skip this import
+            if [[ ${#import_files_list_without_duplicates[@]} -eq 0 ]]; then
+                continue
+            fi
+
             local currdir="$PWD"
             # TODO: change this to get proper paths to ALL import args
             # for now, this is only using the first import arg
             # which for my use case is enough, but I need to implement
             # this in the future to enable things such as:
             # import folder_one/function_one.sh folder_two/function_two.sh
-            local nextdir="${input_args_without_duplicates[0]%/*}"
-            the_actual_script=$(import "${input_args_without_duplicates[@]}")
+            local nextdir="${import_files_list_without_duplicates[0]%/*}"
+            local the_actual_script=$(import "${import_files_list_without_duplicates[@]}")
             if [[ ! -f $nextdir ]]; then
-                # avoid changing directories to cases like:
-                # import some_file.sh
                 cd $nextdir
                 MAIN_DIR="$PWD"
             fi
-            if [[ ${import_functions[0]} == "*" ]]; then
+            if [[ ${import_keywords_list[0]} == "*" ]]; then
                 process_file "$the_actual_script"
             else
-                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_functions[@]}")
+                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_keywords_list[@]}")
                 process_file "$stripped_script"
             fi
+
             cd $currdir
             MAIN_DIR="$PWD"
             continue
-        elif [[ $trimmed_line == "source"* && $trimmed_line == *"oo-bootstrap"* ]]; then
+        elif should_continue "$trimmed_line"; then
             continue
-            # this is sourcing the bootstrap library which is unecessary for compiled files
-        elif [[ $trimmed_line == "builtin source"* && $trimmed_line == *"oo-bootstrap"* ]]; then
-            # this is sourcing the bootstrap library which is unecessary for compiled files
-            # echo "${file_data[i]}"
+        elif should_echo "$trimmed_line"; then
+            echo "$current_line"
             continue
-        elif [[ $trimmed_line == "MAIN_DIR"* ]]; then
-            # its ok for the files to have MAIN_DIR at the top
-            # if they want to be ran as is without compilation
-            echo "${file_data[i]}"
         else
-            # once we find the first non-comment, non-import
-            # non-source, non-main_dir line, we stop sourcing
-            # This means that WE DO NOT want to add any imports
-            # in the middle of the file.
-            echo "${file_data[i]}"
+            echo "$current_line"
             still_sourcing=false
         fi
     done
 }
+# valid import syntax:
+
+# import file
+# import file1 file2
+# import item from file
+# import item1 item2 from file
+## brackets optional if on a single line:
+# import { item1 item2 } from file
+
+## brackets required if using multiple lines
+# import {
+#   item1
+#   item2
+# } from file
 
 
+# args: $1 is name of the array of file data.
+# $2 is the index of the array to start parsing, ie:
+# it is expected that $2 is a line that contains the word 'import'.
+# $3 is the name of the output array to put the
+# list of filenames to import. $4 is the name of the
+# output array to put the list of keywords to import
+# from the filenames
+parse_import_statement() {
+    local -n _lines="$1"
+    local ind="$2"
+    local -n _import_files_list="$3"
+    local -n _import_keywords_list="$4"
+
+    local num_lines="${#_lines[@]}"
+    local current_line="${_lines[ind]}"
+    local remove_import="import "
+    local actual_import_string="${current_line##$remove_import}"
+
+    if [[
+        $current_line != *" from "* && \
+        $current_line != *"{"*
+    ]]; then
+        # no from statement
+        # just a regular import X [...Y] statement
+        for i in $actual_import_string; do
+            _import_files_list+=("$i")
+        done
+        _import_keywords_list=("*")
+    elif [[
+        $current_line == *" from "*
+    ]]; then
+        # has a from statement, but its a one line import:
+        # import A [...B] from X
+        echo "import string: $actual_import_string"
+        local keywords="${actual_import_string%from*}"
+        # remove everything before the from keyword:
+        local remove_from="from\ "
+        actual_import_string="${actual_import_string#*$remove_from}"
+        
+        # in the case of import A B from X, you can only
+        # supply a single import file, so no need to loop
+        # over the import string, at this point
+        # the import string is just the file that
+        # should be imported:
+        # we iterate here incase theres whitespace
+        # on after the from, ie: 'from     X'
+        for i in $actual_import_string; do
+            _import_files_list+=("$i")
+        done
+
+        # explicitly check if its just a star
+        # otherwise, the loop below will loop over files...
+        if [[ $keywords == "* "* ]]; then
+            _import_keywords_list+=("*")
+            return 0
+        fi
+
+        for kname in $keywords; do
+            if [[ $kname != "{" && $kname != "}" ]]; then
+                _import_keywords_list+=("$kname")
+            fi
+        done
+    elif [[
+        $current_line == *"{"*
+    ]]; then
+        # failed to find a 'from' keyword, but we did see an opening
+        # bracket. this means its a multiple line import statement
+        # so go to the next line,
+        # and parse the lines until we find a closing bracket:
+        ((ind+=1))
+        while [[ $ind -lt $num_lines ]]; do
+            current_line="${_lines[ind]}"
+            if [[ $current_line == *"}"* ]]; then
+                # reached the end of the keywords,
+                # this line contains a from X:
+                local remove_from="from\ "
+                actual_import_string="${current_line#*$remove_from}"
+                # we iterate here incase theres whitespace
+                # on after the from, ie: 'from     X'
+                for i in $actual_import_string; do
+                    _import_files_list+=("$i")
+                done
+                skip_i=$ind
+                return 0
+            fi
+
+            for kname in $current_line; do
+                _import_keywords_list+=("$kname")
+            done
+            ((ind+=1))
+        done
+    fi
+}
 
 ECHO_INSTEAD_OF_SOURCE="true"
-
-# no need to source it anymore
-# since its included in this file
-# builtin source "$( cd "${BASH_SOURCE[0]%/*}" && pwd )/oo-bootstrap.sh"
 
 main_script="$1"
 

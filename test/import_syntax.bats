@@ -173,3 +173,36 @@ function setup() {
     [[ "${import_files_list[0]}" == "X" ]]
     [[ "${import_keywords_list[0]}" == "*" ]]
 }
+
+
+@test "can detect multi-line import {\nA\nB\nC\n} from X syntax" {
+    local file_data=(
+        "other lines"
+        # testing out whitespaces:
+        "import {"
+        "      A"
+        "B  "
+        "   C   "
+        "} from     X"
+        "line2"
+        "line3"
+    )
+    local import_files_list=()
+    local import_keywords_list=()
+    # sanity checks:
+    [[ "${#file_data[@]}" -eq 8 ]]
+    [[ "${#import_files_list[@]}" -eq 0 ]]
+    [[ "${#import_keywords_list[@]}" -eq 0 ]]
+
+    parse_import_statement file_data 1 import_files_list import_keywords_list 
+    echo "$output"
+
+    # should not modify the actual file_data array:
+    [[ "${#file_data[@]}" -eq 8 ]]
+    [[ "${#import_files_list[@]}" -eq 1 ]]
+    [[ "${#import_keywords_list[@]}" -eq 3 ]]
+    [[ "${import_files_list[0]}" == "X" ]]
+    [[ "${import_keywords_list[0]}" == "A" ]]
+    [[ "${import_keywords_list[1]}" == "B" ]]
+    [[ "${import_keywords_list[2]}" == "C" ]]
+}

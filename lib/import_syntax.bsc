@@ -58,7 +58,11 @@ parse_import_statement() {
         # over the import string, at this point
         # the import string is just the file that
         # should be imported:
-        _import_files_list+=("$actual_import_string")
+        # we iterate here incase theres whitespace
+        # on after the from, ie: 'from     X'
+        for i in $actual_import_string; do
+            _import_files_list+=("$i")
+        done
 
         # explicitly check if its just a star
         # otherwise, the loop below will loop over files...
@@ -71,6 +75,34 @@ parse_import_statement() {
             if [[ $kname != "{" && $kname != "}" ]]; then
                 _import_keywords_list+=("$kname")
             fi
+        done
+    elif [[
+        $current_line == *"{"*
+    ]]; then
+        # failed to find a 'from' keyword, but we did see an opening
+        # bracket. this means its a multiple line import statement
+        # so go to the next line,
+        # and parse the lines until we find a closing bracket:
+        ((ind+=1))
+        while [[ $ind -lt $num_lines ]]; do
+            current_line="${_lines[ind]}"
+            if [[ $current_line == *"}"* ]]; then
+                # reached the end of the keywords,
+                # this line contains a from X:
+                local remove_from="from\ "
+                actual_import_string="${current_line#*$remove_from}"
+                # we iterate here incase theres whitespace
+                # on after the from, ie: 'from     X'
+                for i in $actual_import_string; do
+                    _import_files_list+=("$i")
+                done
+                return 0
+            fi
+
+            for kname in $current_line; do
+                _import_keywords_list+=("$kname")
+            done
+            ((ind+=1))
         done
     fi
 }

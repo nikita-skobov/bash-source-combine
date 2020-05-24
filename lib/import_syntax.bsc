@@ -1,0 +1,73 @@
+# valid import syntax:
+
+# import file
+# import file1 file2
+# import item from file
+# import item1 item2 from file
+## brackets optional if on a single line:
+# import { item1 item2 } from file
+
+## brackets required if using multiple lines
+# import {
+#   item1
+#   item2
+# } from file
+
+
+# args: $1 is name of the array of file data.
+# $2 is the index of the array to start parsing, ie:
+# it is expected that $2 is a line that contains the word 'import'.
+# $3 is the name of the output array to put the
+# list of filenames to import. $4 is the name of the
+# output array to put the list of keywords to import
+# from the filenames
+parse_import_statement() {
+    local -n _lines="$1"
+    local ind="$2"
+    local -n _import_files_list="$3"
+    local -n _import_keywords_list="$4"
+
+    local num_lines="${#_lines[@]}"
+    local current_line="${_lines[ind]}"
+    local remove_import="import "
+    local actual_import_string="${current_line##$remove_import}"
+
+    if [[
+        $current_line != *" from "* && \
+        $current_line != *"{"*
+    ]]; then
+        # no from statement
+        # just a regular import X [...Y] statement
+        for i in $actual_import_string; do
+            _import_files_list+=("$i")
+        done
+        _import_keywords_list=("*")
+    elif [[
+        $current_line == *" from "*
+    ]]; then
+        # has a from statement, but its a one line import:
+        # import A [...B] from X
+        echo "import string: $actual_import_string"
+        local keywords="${actual_import_string%from*}"
+        # remove everything before the from keyword:
+        actual_import_string="${actual_import_string#*from\ }"
+        
+        # in the case of import A B from X, you can only
+        # supply a single import file, so no need to loop
+        # over the import string, at this point
+        # the import string is just the file that
+        # should be imported:
+        _import_files_list+=("$actual_import_string")
+
+        # explicitly check if its just a star
+        # otherwise, the loop below will loop over files...
+        if [[ $keywords == "* " ]]; then
+            _import_keywords_list+=("*")
+            return 0
+        fi
+
+        for kname in $keywords; do
+            _import_keywords_list+=("$kname")
+        done
+    fi
+}

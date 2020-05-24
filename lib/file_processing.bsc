@@ -96,9 +96,8 @@ strip_unused_functions() {
 process_file() {
     local file_data=()
     while IFS= read -r line; do
-        echo "$line"
+        file_data+=("$line")
     done <<< "$1"
-    # echo "$1"
 
     local still_sourcing=true
 
@@ -112,14 +111,9 @@ process_file() {
 
         local current_line=${file_data[i]}
         # remove whitespace:
-        local trimmed_line="${lin#"${lin%%[![:space:]]*}"}"
+        local trimmed_line="${current_line#"${current_line%%[![:space:]]*}"}"
 
-        if should_echo "$trimmed_line"; then
-            echo "$current_line"
-            continue
-        elif should_continue "$trimmed_line"; then
-            continue
-        elif should_process_import "$trimmed_line"; then
+        if should_process_import "$trimmed_line"; then
             local import_files_list=()
             local import_keywords_list=()
             parse_import_statement file_data $i import_files_list import_keywords_list 
@@ -133,7 +127,7 @@ process_file() {
             # this in the future to enable things such as:
             # import folder_one/function_one.sh folder_two/function_two.sh
             local nextdir="${import_files_list[0]%/*}"
-            local the_actual_script=$(import "${input_args_without_duplicates[@]}")
+            local the_actual_script=$(import "${import_files_list[@]}")
             if [[ ! -f $nextdir ]]; then
                 cd $nextdir
                 MAIN_DIR="$PWD"
@@ -147,6 +141,11 @@ process_file() {
 
             cd $currdir
             MAIN_DIR="$PWD"
+            continue
+        elif should_continue "$trimmed_line"; then
+            continue
+        elif should_echo "$trimmed_line"; then
+            echo "$current_line"
             continue
         else
             echo "$current_line"

@@ -1,4 +1,8 @@
+import ./oo-bootstrap.bsc
 import ./file_processing.bsc
+import ./import_syntax.bsc
+
+ECHO_INSTEAD_OF_SOURCE="true"
 
 main_script="$1"
 

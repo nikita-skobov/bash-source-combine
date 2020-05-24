@@ -1,8 +1,4 @@
-#!/usr/bin/env bash
-
-process_file() {
-    echo "$1"
-}
+import ./file_processing.bsc
 
 main_script="$1"
 

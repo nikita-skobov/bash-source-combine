@@ -35,15 +35,34 @@ function teardown() {
     [[ $number_of_occurences -eq 1 ]]
 }
 
-# TODO: implement this feature
-# @test "duplicate function checking works" {
-#     # assumes bats tmpdir is: /tmp
-#     echo -e "$duplicate_contents" > $BATS_TMPDIR/duplicate.sh
-#     echo -e "import should_only from ./duplicate.sh\n$some_other_contents" > $BATS_TMPDIR/some_other_file.sh
-#     echo -e "import ./some_other_file.sh\nimport should_only from ./duplicate.sh\n$some_contents" > $BATS_TMPDIR/some_file.sh
-#     some_file="$BATS_TMPDIR/some_file.sh"
-#     run $source_combine $some_file
-#     echo "$output"
-#     number_of_occurences=$(grep -o 'should_o nly' <<< "$output" | wc -l)
-#     [[ $number_of_occurences -eq 1 ]]
-# }
+# a simple check if
+# we imported something called A
+# already, then dont import A again
+# if import A from X shows up again somewhere
+@test "duplicate function checking works" {
+    echo -e "$duplicate_contents" > $BATS_TMPDIR/duplicate.sh
+    echo -e "import should_only from ./duplicate.sh\n$some_other_contents" > $BATS_TMPDIR/some_other_file.sh
+    echo -e "import ./some_other_file.sh\nimport should_only from ./duplicate.sh\n$some_contents" > $BATS_TMPDIR/some_file.sh
+    some_file="$BATS_TMPDIR/some_file.sh"
+    run $source_combine $some_file
+    echo "$output"
+    number_of_occurences=$(grep -o 'should_only' <<< "$output" | wc -l)
+    [[ $number_of_occurences -eq 1 ]]
+}
+
+# if you have:
+# import X
+# and later you have:
+# import A from X
+# we should not import A because
+# the entirety of X was already imported
+@test "dupl func check works for importAfromX before importX" {
+    echo -e "$duplicate_contents" > $BATS_TMPDIR/duplicate.sh
+    echo -e "import should_only from ./duplicate.sh\n$some_other_contents" > $BATS_TMPDIR/some_other_file.sh
+    echo -e "import ./duplicate.sh\nimport ./some_other_file.sh\n$some_contents" > $BATS_TMPDIR/some_file.sh
+    some_file="$BATS_TMPDIR/some_file.sh"
+    run $source_combine $some_file
+    echo "$output"
+    number_of_occurences=$(grep -o 'should_only' <<< "$output" | wc -l)
+    [[ $number_of_occurences -eq 1 ]]
+}

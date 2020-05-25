@@ -141,13 +141,13 @@ process_file() {
             local import_files_list_without_duplicates=()
             # only check file duplicates if the import is the entire file
             if [[ "${import_keywords_list[0]}" == "*" ]]; then
-                for i in ${import_files_list[@]}; do
-                    local full_path=$(readlink -f $i)
+                for j in ${import_files_list[@]}; do
+                    local full_path=$(readlink -f $j)
                     if [[ "${full_path_cache[@]}" != *"$full_path"* ]]; then
                         # this is a file that has not been imported before
                         # so add it to the cache, to prevent it from
                         # being imported again in the future
-                        import_files_list_without_duplicates+=("$i")
+                        import_files_list_without_duplicates+=("$j")
                         full_path_cache+=("$full_path")
                     fi
                 done

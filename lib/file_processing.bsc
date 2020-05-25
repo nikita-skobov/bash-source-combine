@@ -93,10 +93,33 @@ strip_unused_functions() {
     done
 }
 
+# args: $1 the full path of the file being checked.
+# If the full path exists in the full path cache, return true.
+file_has_been_imported() {
+    for file_name in "${full_path_cache[@]}"; do
+        if [[ $1 == $file_name ]]; then
+            # file has been imported already:
+            return 0
+        fi
+    done
+    # file has not been imported yet:
+    return 1
+}
+
 # a variable of absolute paths to files that
 # have been imported. before importing a file
 # check if its full path exists here.
 full_path_cache=()
+
+# a variable of function names that have been imported as
+# import A from X. This variable does not contain
+# function names that are imported as import X, because
+# when we import an entire file, we don't source/evaluate
+# what is in the file. so therefore something like:
+# import A from X
+# import X
+# will contain multiple functions A.
+function_name_cache=()
 
 process_file() {
     local file_data=()
@@ -136,21 +159,56 @@ process_file() {
             local import_files_list=()
             local import_keywords_list=()
             parse_import_statement file_data $i import_files_list import_keywords_list 
-            # TODO:
-            # implement duplicate keyword checking
             local import_files_list_without_duplicates=()
-            for i in ${import_files_list[@]}; do
-                local full_path=$(readlink -f $i)
-                if [[ "${full_path_cache[@]}" != *"$full_path"* ]]; then
-                    # this is a file that has not been imported before
-                    # so add it to the cache, to prevent it from
-                    # being imported again in the future
-                    import_files_list_without_duplicates+=("$i")
-                    full_path_cache+=("$full_path")
-                fi
-            done
+            local import_keywords_list_without_duplicates=()
 
-            # if we removed all duplicates, and the remaining list
+            # only check file duplicates if the import is the entire file
+            if [[ "${import_keywords_list[0]}" == "*" ]]; then
+                for j in ${import_files_list[@]}; do
+                    local full_path=$(readlink -f $j)
+                    if ! file_has_been_imported "$full_path"; then
+                        # this is a file that has not been imported before
+                        # so add it to the cache, to prevent it from
+                        # being imported again in the future
+                        import_files_list_without_duplicates+=("$j")
+                        full_path_cache+=("$full_path")
+                    fi
+                done
+            else
+                # in the event that import keywords list is not everything: "*"
+                # then the import files list should just be a single file
+                # ie: "import A from X", you cannot have "import A from X Y"
+
+                # first: theres no need to import any keyword
+                # if the file has been imported already entirely
+                # so check for that:
+                local full_path=$(readlink -f ${import_files_list[0]})
+                if ! file_has_been_imported "$full_path"; then
+                    import_files_list_without_duplicates=("${import_files_list[@]}")
+                    # check for keyword duplicates by iterating over
+                    # the keywords that we are importing:
+                    for j in ${import_keywords_list[@]}; do
+                        if [[ ${#function_name_cache[@]} -eq 0 ]]; then
+                            # cache is empty, so of course we import j:
+                            import_keywords_list_without_duplicates+=("$j")
+                            function_name_cache+=("$j")
+                        else
+                            # cache is not empty, check if the import keyword j
+                            # exists in the function name cache. if it does
+                            # not exist, import it, and add it to the cache
+                            for k in ${function_name_cache[@]}; do
+                                if [[ $j != $k ]]; then
+                                    import_keywords_list_without_duplicates+=("$j")
+                                    function_name_cache+=("$j")
+                                fi
+                            done
+                        fi
+                    done
+                fi
+            fi
+
+            # if we removed all duplicate import files
+            # and the remaining list
             # is empty, skip this import
             if [[ ${#import_files_list_without_duplicates[@]} -eq 0 ]]; then
                 continue
@@ -170,8 +228,8 @@ process_file() {
             fi
             if [[ ${import_keywords_list[0]} == "*" ]]; then
                 process_file "$the_actual_script"
-            else
-                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_keywords_list[@]}")
+            elif [[ ${#import_keywords_list_without_duplicates[@]} != "0" ]]; then
+                local stripped_script=$(strip_unused_functions "$the_actual_script" "${import_keywords_list_without_duplicates[@]}")
                 process_file "$stripped_script"
             fi
 

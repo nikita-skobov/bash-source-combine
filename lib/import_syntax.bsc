@@ -47,7 +47,6 @@ parse_import_statement() {
     ]]; then
         # has a from statement, but its a one line import:
         # import A [...B] from X
-        echo "import string: $actual_import_string"
         local keywords="${actual_import_string%from*}"
         # remove everything before the from keyword:
         local remove_from="from\ "

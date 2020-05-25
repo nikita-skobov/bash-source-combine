@@ -1,0 +1,15 @@
+v2.1.0
+- adds function deduplication checking
+- fixes file deduplication checking
+
+v2.0.0
+- refactors script as a library of several files that get compiled into the script at the root of the directory
+- adds tests
+- adds file deduplication checking
+- adds multiline import syntax
+
+
+v1.0.0
+- added file transclusion using import X syntax
+- support for multiple files imported ie: import X Y Z
+- import A from X syntax

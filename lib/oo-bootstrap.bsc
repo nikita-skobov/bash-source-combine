@@ -265,8 +265,10 @@ throw() { eval 'cat <<< "Exception: $e ($*)" 1>&2; read -s;'; }
 System::Bootstrap
 
 alias import="__oo__allowFileReloading=false System::Import"
-alias source="__oo__allowFileReloading=true System::ImportOne"
-alias .="__oo__allowFileReloading=true System::ImportOne"
+# UPDATE 05/29/2020: REMOVES ALIASES
+# BECAUSE IMPORTING IS DISTINCT FROM SOURCING
+# alias source="__oo__allowFileReloading=true System::ImportOne"
+# alias .="__oo__allowFileReloading=true System::ImportOne"
 
 declare -g __oo__bootstrapped=true
 

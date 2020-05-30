@@ -470,12 +470,17 @@ process_file() {
                             # cache is not empty, check if the import keyword j
                             # exists in the function name cache. if it does
                             # not exist, import it, and add it to the cache
+                            local exists_in_cache=false
                             for k in ${function_name_cache[@]}; do
-                                if [[ $j != $k ]]; then
-                                    import_keywords_list_without_duplicates+=("$j")
-                                    function_name_cache+=("$j")
+                                if [[ $j == $k ]]; then
+                                    exists_in_cache=true
+                                    break
                                 fi
                             done
+                            if [[ $exists_in_cache == false ]]; then
+                                import_keywords_list_without_duplicates+=("$j")
+                                function_name_cache+=("$j")
+                            fi
                         fi
                     done
                 fi

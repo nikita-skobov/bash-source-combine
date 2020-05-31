@@ -266,8 +266,10 @@ throw() { eval 'cat <<< "Exception: $e ($*)" 1>&2; read -s;'; }
 System::Bootstrap
 
 alias import="__oo__allowFileReloading=false System::Import"
-alias source="__oo__allowFileReloading=true System::ImportOne"
-alias .="__oo__allowFileReloading=true System::ImportOne"
+# UPDATE 05/29/2020: REMOVES ALIASES
+# BECAUSE IMPORTING IS DISTINCT FROM SOURCING
+# alias source="__oo__allowFileReloading=true System::ImportOne"
+# alias .="__oo__allowFileReloading=true System::ImportOne"
 
 declare -g __oo__bootstrapped=true
 
@@ -470,12 +472,17 @@ process_file() {
                             # cache is not empty, check if the import keyword j
                             # exists in the function name cache. if it does
                             # not exist, import it, and add it to the cache
+                            local exists_in_cache=false
                             for k in ${function_name_cache[@]}; do
-                                if [[ $j != $k ]]; then
-                                    import_keywords_list_without_duplicates+=("$j")
-                                    function_name_cache+=("$j")
+                                if [[ $j == $k ]]; then
+                                    exists_in_cache=true
+                                    break
                                 fi
                             done
+                            if [[ $exists_in_cache == false ]]; then
+                                import_keywords_list_without_duplicates+=("$j")
+                                function_name_cache+=("$j")
+                            fi
                         fi
                     done
                 fi

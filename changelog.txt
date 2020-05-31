@@ -1,3 +1,7 @@
+v2.1.1
+- fixes duplicate function checking
+- removes oo-bootstrap source alias
+
 v2.1.0
 - adds function deduplication checking
 - fixes file deduplication checking
